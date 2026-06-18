@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Japan Transport Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --ink: #0d0d0d;
+    --paper: #f7f5f0;
+    --deep: #1a1a2e;
+    --rail: #e63946;
+    --platform: #457b9d;
+    --sakura: #ffb7c5;
+    --gold: #f4a261;
+    --moss: #52b788;
+    --mist: #a8b5c8;
+    --grid: rgba(13,13,13,0.06);
+    --card: #ffffff;
+    --border: rgba(13,13,13,0.1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--deep);
+    color: #fff;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .header-inner {
+    display: flex;
+    align-items: stretch;
+    min-height: 120px;
+  }
+  .header-accent {
+    width: 8px;
+    background: var(--rail);
+    flex-shrink: 0;
+  }
+  .header-content {
+    padding: 28px 36px;
+    flex: 1;
+  }
+  .header-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mist);
+    margin-bottom: 8px;
+  }
+  .header-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .header-title span { color: var(--rail); }
+  .header-sub {
+    font-size: 13px;
+    color: var(--mist);
+    margin-top: 8px;
+    font-weight: 300;
+  }
+  .header-stats {
+    display: flex;
+    gap: 0;
+    border-left: 1px solid rgba(255,255,255,0.08);
+  }
+  .hstat {
+    padding: 28px 28px;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 120px;
+  }
+  .hstat-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+  }
+  .hstat-num.rail { color: var(--rail); }
+  .hstat-num.gold { color: var(--gold); }
+  .hstat-num.moss { color: var(--moss); }
+  .hstat-label {
+    font-size: 10px;
+    color: var(--mist);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+  }
+
+  /* ── FILTERS ── */
+  .filter-bar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 36px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--mist);
+    flex-shrink: 0;
+  }
+  .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--ink);
+    transition: all 0.15s;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .chip:hover { border-color: var(--rail); color: var(--rail); }
+  .chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .chip.transport-public.active { background: var(--platform); border-color: var(--platform); }
+  .chip.transport-vehicle.active { background: var(--gold); border-color: var(--gold); color: var(--ink); }
+  .filter-sep { width: 1px; height: 24px; background: var(--border); }
+
+  /* ── GRID ── */
+  .main { padding: 28px 36px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .grid-full { margin-bottom: 20px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid var(--grid);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+  }
+  .card-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--mist);
+  }
+  .card-body { padding: 20px; }
+
+  /* ── CHART WRAPPER ── */
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* ── PREFECTURE BARS ── */
+  .pref-list { display: flex; flex-direction: column; gap: 10px; }
+  .pref-row { display: grid; grid-template-columns: 72px 1fr 60px; gap: 10px; align-items: center; }
+  .pref-name { font-size: 12px; font-weight: 500; color: var(--ink); }
+  .pref-bar-track { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+  .pref-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(.16,1,.3,1); }
+  .pref-val { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--mist); text-align: right; }
+
+  /* ── HEATMAP ── */
+  .heatmap-grid {
+    display: grid;
+    gap: 3px;
+    margin-top: 4px;
+  }
+  .heatmap-cell {
+    border-radius: 2px;
+    aspect-ratio: 1.3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    cursor: default;
+    transition: transform 0.1s;
+    position: relative;
+  }
+  .heatmap-cell:hover { transform: scale(1.15); z-index: 10; }
+  .hm-row-label { font-size: 10px; color: var(--mist); display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; font-weight: 500; }
+  .hm-col-label { font-size: 9px; color: var(--mist); text-align: center; padding-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── SCATTER ── */
+  .scatter-info { font-size: 11px; color: var(--mist); margin-top: 8px; line-height: 1.5; }
+
+  /* ── SATISFACTION RINGS ── */
+  .rings-wrap { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .ring-item { text-align: center; }
+  .ring-svg { display: block; margin: 0 auto 6px; }
+  .ring-label { font-size: 10px; color: var(--mist); text-transform: uppercase; letter-spacing: 0.08em; }
+  .ring-val { font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+
+  /* ── INSIGHT CARDS ── */
+  .insight-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .insight-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .insight-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .insight-card.red::before { background: var(--rail); }
+  .insight-card.blue::before { background: var(--platform); }
+  .insight-card.gold::before { background: var(--gold); }
+  .insight-card.green::before { background: var(--moss); }
+  .insight-icon { font-size: 20px; margin-bottom: 10px; }
+  .insight-num { font-family: 'Space Mono', monospace; font-size: 28px; font-weight: 700; line-height: 1; }
+  .insight-num.red { color: var(--rail); }
+  .insight-num.blue { color: var(--platform); }
+  .insight-num.gold { color: var(--gold); }
+  .insight-num.green { color: var(--moss); }
+  .insight-desc { font-size: 11px; color: var(--mist); margin-top: 4px; line-height: 1.4; }
+  .insight-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink); margin-bottom: 4px; }
+
+  /* ── TABLE ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    font-weight: 600; color: var(--mist); padding: 8px 12px;
+    text-align: left; border-bottom: 1px solid var(--border);
+    background: #fafafa; position: sticky; top: 0;
+  }
+  .data-table td { padding: 9px 12px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  .data-table tr:hover td { background: rgba(69,123,157,0.04); }
+  .table-wrap { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 3px; }
+  .transport-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 600;
+  }
+  .badge-public { background: rgba(69,123,157,0.12); color: var(--platform); }
+  .badge-vehicle { background: rgba(244,162,97,0.15); color: #c47a30; }
+  .score-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px;
+  }
+  .table-search {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+    border-bottom: none; background: var(--card); border-radius: 3px 3px 0 0;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: var(--ink);
+    outline: none;
+  }
+  .table-search:focus { border-color: var(--platform); }
+  .table-count { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--mist); }
+
+  /* ── TOOLTIP ── */
+  .tooltip-custom {
+    position: fixed; background: var(--ink); color: #fff;
+    padding: 8px 12px; border-radius: 3px; font-size: 11px;
+    pointer-events: none; display: none; z-index: 1000;
+    line-height: 1.6; max-width: 200px;
+  }
+
+  /* ── MONTH SELECTOR ── */
+  .month-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+  .month-btn {
+    padding: 4px 10px; border-radius: 2px; font-size: 11px;
+    font-family: 'Space Mono', monospace; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--ink);
+    transition: all 0.15s;
+  }
+  .month-btn.active { background: var(--deep); color: #fff; border-color: var(--deep); }
+  .month-btn:hover:not(.active) { border-color: var(--rail); }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 20px; padding: 16px 36px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-note { font-size: 11px; color: var(--mist); }
+  .footer-logo { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--mist); }
+
+  /* ── LOADING ── */
+  .loading { text-align: center; padding: 40px; color: var(--mist); font-size: 13px; }
+
+  @media (max-width: 900px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .insight-row { grid-template-columns: 1fr 1fr; }
+    .header-stats { display: none; }
+    .main { padding: 16px; }
+    .filter-bar { padding: 12px 16px; }
+    .rings-wrap { grid-template-columns: repeat(3, 1fr); }
+    .header-content { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="tooltip-custom" id="tooltip"></div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="header-accent"></div>
+    <div class="header-content">
+      <div class="header-eyebrow">交通利用データ / Transport Intelligence</div>
+      <div class="header-title">Japan <span>Transport</span> Dashboard</div>
+      <div class="header-sub">Jan–Aug 2025 · 8 Prefectures · 240 Records</div>
+    </div>
+    <div class="header-stats">
+      <div class="hstat">
+        <div class="hstat-num rail" id="hs-records">240</div>
+        <div class="hstat-label">Records</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-num gold" id="hs-avg-trips">10.5</div>
+        <div class="hstat-label">Avg Trips/Wk</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-num moss" id="hs-avg-sat">4.0</div>
+        <div class="hstat-label">Avg Satisfaction</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-num" id="hs-avg-cost">¥17.7k</div>
+        <div class="hstat-label">Avg Monthly Cost</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <span class="filter-label">Transport</span>
+  <div class="filter-chips" id="chips-transport">
+    <button class="chip active" data-key="transport" data-val="all">All</button>
+    <button class="chip transport-public" data-key="transport" data-val="Public Transport">Public</button>
+    <button class="chip transport-vehicle" data-key="transport" data-val="Personal Vehicle">Vehicle</button>
+  </div>
+  <div class="filter-sep"></div>
+  <span class="filter-label">Gender</span>
+  <div class="filter-chips" id="chips-gender">
+    <button class="chip active" data-key="gender" data-val="all">All</button>
+    <button class="chip" data-key="gender" data-val="Male">Male</button>
+    <button class="chip" data-key="gender" data-val="Female">Female</button>
+  </div>
+  <div class="filter-sep"></div>
+  <span class="filter-label">Purpose</span>
+  <div class="filter-chips" id="chips-purpose">
+    <button class="chip active" data-key="purpose" data-val="all">All</button>
+    <button class="chip" data-key="purpose" data-val="Work">Work</button>
+    <button class="chip" data-key="purpose" data-val="Education">Education</button>
+    <button class="chip" data-key="purpose" data-val="Shopping">Shopping</button>
+    <button class="chip" data-key="purpose" data-val="Leisure">Leisure</button>
+    <button class="chip" data-key="purpose" data-val="Mixed">Mixed</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- KPI ROW -->
+  <div class="insight-row" id="insight-row">
+    <div class="insight-card red">
+      <div class="insight-icon">🚆</div>
+      <div class="insight-label">Public Transport</div>
+      <div class="insight-num red" id="kpi-public">—</div>
+      <div class="insight-desc" id="kpi-public-pct">— of filtered records</div>
+    </div>
+    <div class="insight-card blue">
+      <div class="insight-icon">🚗</div>
+      <div class="insight-label">Personal Vehicle</div>
+      <div class="insight-num blue" id="kpi-vehicle">—</div>
+      <div class="insight-desc" id="kpi-vehicle-pct">— of filtered records</div>
+    </div>
+    <div class="insight-card gold">
+      <div class="insight-icon">📍</div>
+      <div class="insight-label">Avg Distance / Week</div>
+      <div class="insight-num gold" id="kpi-dist">—</div>
+      <div class="insight-desc">kilometres per commuter</div>
+    </div>
+    <div class="insight-card green">
+      <div class="insight-icon">⭐</div>
+      <div class="insight-label">Avg Satisfaction</div>
+      <div class="insight-num green" id="kpi-sat">—</div>
+      <div class="insight-desc">out of 5.0 max score</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Prefecture bars + Transport donut -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Trips / Week by Prefecture</span>
+        <span class="card-tag" id="pref-sort-tag">avg trips</span>
+      </div>
+      <div class="card-body">
+        <div class="pref-list" id="pref-bars"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Transport Mode Split</span>
+        <span class="card-tag">by count</span>
+      </div>
+      <div class="card-body" style="display:flex;gap:20px;align-items:center;">
+        <div class="chart-wrap" style="width:180px;flex-shrink:0;">
+          <canvas id="chart-donut" height="180"></canvas>
+        </div>
+        <div id="donut-legend" style="flex:1;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Monthly trend + Age group -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Monthly Cost Trend</span>
+        <div class="month-btns" id="month-metric-btns">
+          <button class="month-btn active" data-metric="cost">Cost ¥</button>
+          <button class="month-btn" data-metric="trips">Trips</button>
+          <button class="month-btn" data-metric="dist">Distance</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="chart-line"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Age Group Breakdown</span>
+        <span class="card-tag">avg monthly cost ¥</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="chart-age"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Heatmap + Satisfaction rings -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Satisfaction Heatmap</span>
+        <span class="card-tag">prefecture × age group</span>
+      </div>
+      <div class="card-body">
+        <div id="heatmap-container"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Satisfaction by Purpose</span>
+        <span class="card-tag">avg score / 5.0</span>
+      </div>
+      <div class="card-body">
+        <div class="rings-wrap" id="rings-wrap"></div>
+        <div class="chart-wrap" style="height:150px;margin-top:16px;">
+          <canvas id="chart-purpose-bar"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Scatter cost vs distance -->
+  <div class="grid-full">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Cost vs Distance Scatter</span>
+        <span class="card-tag">colored by transport type</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height:260px;">
+          <canvas id="chart-scatter"></canvas>
+        </div>
+        <div class="scatter-info">🔵 Public Transport &nbsp;&nbsp; 🟠 Personal Vehicle &nbsp;&nbsp; Hover points for details.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 5: Data table -->
+  <div class="grid-full">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Raw Data Explorer</span>
+        <span class="card-tag table-count" id="table-count">240 rows</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <input class="table-search" id="table-search" placeholder="Search prefecture, age group, purpose…" />
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Prefecture</th>
+                <th>Age</th>
+                <th>Gender</th>
+                <th>Transport</th>
+                <th>Trips/Wk</th>
+                <th>Dist km</th>
+                <th>Cost ¥</th>
+                <th>Purpose</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <div class="footer-note">Data: Japan Transport Usage Dataset 2025 · 240 records · Jan–Aug</div>
+  <div class="footer-logo">TRANSPORT / 交通 / INTEL</div>
+</div>
+
+<script>
+const RAW = [{"Record_ID":1,"Date":"2025-01-02","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":70,"Monthly_Cost_JPY":23030,"Commute_Purpose":"Work","Satisfaction_Score":3.0},{"Record_ID":2,"Date":"2025-01-03","Prefecture":"Hokkaido","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":18,"Distance_km_Per_Week":233,"Monthly_Cost_JPY":15175,"Commute_Purpose":"Mixed","Satisfaction_Score":4.7},{"Record_ID":3,"Date":"2025-01-04","Prefecture":"Saitama","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":129,"Monthly_Cost_JPY":9640,"Commute_Purpose":"Shopping","Satisfaction_Score":4.2},{"Record_ID":4,"Date":"2025-01-05","Prefecture":"Kanagawa","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":52,"Monthly_Cost_JPY":21261,"Commute_Purpose":"Mixed","Satisfaction_Score":4.2},{"Record_ID":5,"Date":"2025-01-06","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":62,"Monthly_Cost_JPY":5072,"Commute_Purpose":"Leisure","Satisfaction_Score":4.8},{"Record_ID":6,"Date":"2025-01-07","Prefecture":"Aichi","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":235,"Monthly_Cost_JPY":21804,"Commute_Purpose":"Work","Satisfaction_Score":3.8},{"Record_ID":7,"Date":"2025-01-08","Prefecture":"Osaka","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":218,"Monthly_Cost_JPY":20037,"Commute_Purpose":"Shopping","Satisfaction_Score":4.0},{"Record_ID":8,"Date":"2025-01-09","Prefecture":"Aichi","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":389,"Monthly_Cost_JPY":22753,"Commute_Purpose":"Shopping","Satisfaction_Score":4.2},{"Record_ID":9,"Date":"2025-01-10","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":336,"Monthly_Cost_JPY":7953,"Commute_Purpose":"Mixed","Satisfaction_Score":4.8},{"Record_ID":10,"Date":"2025-01-11","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":395,"Monthly_Cost_JPY":29180,"Commute_Purpose":"Mixed","Satisfaction_Score":3.2},{"Record_ID":11,"Date":"2025-01-12","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":19,"Distance_km_Per_Week":83,"Monthly_Cost_JPY":19185,"Commute_Purpose":"Mixed","Satisfaction_Score":3.3},{"Record_ID":12,"Date":"2025-01-13","Prefecture":"Tokyo","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":167,"Monthly_Cost_JPY":16166,"Commute_Purpose":"Work","Satisfaction_Score":4.5},{"Record_ID":13,"Date":"2025-01-14","Prefecture":"Tokyo","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":177,"Monthly_Cost_JPY":19482,"Commute_Purpose":"Leisure","Satisfaction_Score":4.4},{"Record_ID":14,"Date":"2025-01-15","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":66,"Monthly_Cost_JPY":23728,"Commute_Purpose":"Mixed","Satisfaction_Score":4.0},{"Record_ID":15,"Date":"2025-01-16","Prefecture":"Tokyo","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":20,"Distance_km_Per_Week":166,"Monthly_Cost_JPY":3695,"Commute_Purpose":"Education","Satisfaction_Score":3.3},{"Record_ID":16,"Date":"2025-01-17","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":99,"Monthly_Cost_JPY":4170,"Commute_Purpose":"Education","Satisfaction_Score":3.1},{"Record_ID":17,"Date":"2025-01-18","Prefecture":"Kyoto","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":19,"Distance_km_Per_Week":233,"Monthly_Cost_JPY":16546,"Commute_Purpose":"Work","Satisfaction_Score":4.7},{"Record_ID":18,"Date":"2025-01-19","Prefecture":"Kyoto","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":129,"Monthly_Cost_JPY":20060,"Commute_Purpose":"Work","Satisfaction_Score":5.0},{"Record_ID":19,"Date":"2025-01-20","Prefecture":"Aichi","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":154,"Monthly_Cost_JPY":24415,"Commute_Purpose":"Education","Satisfaction_Score":4.6},{"Record_ID":20,"Date":"2025-01-21","Prefecture":"Saitama","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":180,"Monthly_Cost_JPY":9748,"Commute_Purpose":"Work","Satisfaction_Score":3.8},{"Record_ID":21,"Date":"2025-01-22","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":154,"Monthly_Cost_JPY":12847,"Commute_Purpose":"Education","Satisfaction_Score":4.2},{"Record_ID":22,"Date":"2025-01-23","Prefecture":"Hokkaido","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":214,"Monthly_Cost_JPY":16385,"Commute_Purpose":"Work","Satisfaction_Score":4.4},{"Record_ID":23,"Date":"2025-01-24","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":38,"Monthly_Cost_JPY":10864,"Commute_Purpose":"Work","Satisfaction_Score":3.4},{"Record_ID":24,"Date":"2025-01-25","Prefecture":"Kyoto","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":88,"Monthly_Cost_JPY":34701,"Commute_Purpose":"Work","Satisfaction_Score":4.3},{"Record_ID":25,"Date":"2025-01-26","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":29,"Monthly_Cost_JPY":8522,"Commute_Purpose":"Education","Satisfaction_Score":3.2},{"Record_ID":26,"Date":"2025-01-27","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":130,"Monthly_Cost_JPY":5153,"Commute_Purpose":"Work","Satisfaction_Score":4.4},{"Record_ID":27,"Date":"2025-01-28","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":324,"Monthly_Cost_JPY":29287,"Commute_Purpose":"Shopping","Satisfaction_Score":4.8},{"Record_ID":28,"Date":"2025-01-29","Prefecture":"Osaka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":188,"Monthly_Cost_JPY":34371,"Commute_Purpose":"Shopping","Satisfaction_Score":4.3},{"Record_ID":29,"Date":"2025-01-30","Prefecture":"Osaka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":222,"Monthly_Cost_JPY":33145,"Commute_Purpose":"Work","Satisfaction_Score":3.1},{"Record_ID":30,"Date":"2025-01-31","Prefecture":"Aichi","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":157,"Monthly_Cost_JPY":28350,"Commute_Purpose":"Leisure","Satisfaction_Score":4.4},{"Record_ID":31,"Date":"2025-02-01","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":216,"Monthly_Cost_JPY":20815,"Commute_Purpose":"Mixed","Satisfaction_Score":3.6},{"Record_ID":32,"Date":"2025-02-02","Prefecture":"Kanagawa","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":347,"Monthly_Cost_JPY":16659,"Commute_Purpose":"Mixed","Satisfaction_Score":3.4},{"Record_ID":33,"Date":"2025-02-03","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":237,"Monthly_Cost_JPY":12106,"Commute_Purpose":"Work","Satisfaction_Score":3.2},{"Record_ID":34,"Date":"2025-02-04","Prefecture":"Fukuoka","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":16,"Distance_km_Per_Week":215,"Monthly_Cost_JPY":10462,"Commute_Purpose":"Mixed","Satisfaction_Score":4.7},{"Record_ID":35,"Date":"2025-02-05","Prefecture":"Saitama","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":19,"Distance_km_Per_Week":223,"Monthly_Cost_JPY":19899,"Commute_Purpose":"Work","Satisfaction_Score":3.7},{"Record_ID":36,"Date":"2025-02-06","Prefecture":"Aichi","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":193,"Monthly_Cost_JPY":9709,"Commute_Purpose":"Mixed","Satisfaction_Score":4.5},{"Record_ID":37,"Date":"2025-02-07","Prefecture":"Saitama","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":396,"Monthly_Cost_JPY":11604,"Commute_Purpose":"Education","Satisfaction_Score":3.4},{"Record_ID":38,"Date":"2025-02-08","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":36,"Monthly_Cost_JPY":27097,"Commute_Purpose":"Work","Satisfaction_Score":5.0},{"Record_ID":39,"Date":"2025-02-09","Prefecture":"Kyoto","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":97,"Monthly_Cost_JPY":14175,"Commute_Purpose":"Work","Satisfaction_Score":3.1},{"Record_ID":40,"Date":"2025-02-10","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":11,"Distance_km_Per_Week":187,"Monthly_Cost_JPY":10305,"Commute_Purpose":"Shopping","Satisfaction_Score":3.8},{"Record_ID":41,"Date":"2025-02-11","Prefecture":"Tokyo","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":357,"Monthly_Cost_JPY":16389,"Commute_Purpose":"Mixed","Satisfaction_Score":3.4},{"Record_ID":42,"Date":"2025-02-12","Prefecture":"Hokkaido","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":9,"Distance_km_Per_Week":207,"Monthly_Cost_JPY":19066,"Commute_Purpose":"Work","Satisfaction_Score":3.3},{"Record_ID":43,"Date":"2025-02-13","Prefecture":"Hokkaido","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":20,"Distance_km_Per_Week":77,"Monthly_Cost_JPY":10954,"Commute_Purpose":"Leisure","Satisfaction_Score":4.6},{"Record_ID":44,"Date":"2025-02-14","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":18,"Distance_km_Per_Week":141,"Monthly_Cost_JPY":11338,"Commute_Purpose":"Leisure","Satisfaction_Score":4.6},{"Record_ID":45,"Date":"2025-02-15","Prefecture":"Saitama","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":11,"Distance_km_Per_Week":230,"Monthly_Cost_JPY":15204,"Commute_Purpose":"Leisure","Satisfaction_Score":3.9},{"Record_ID":46,"Date":"2025-02-16","Prefecture":"Hokkaido","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":112,"Monthly_Cost_JPY":9692,"Commute_Purpose":"Mixed","Satisfaction_Score":4.6},{"Record_ID":47,"Date":"2025-02-17","Prefecture":"Kanagawa","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":9,"Distance_km_Per_Week":201,"Monthly_Cost_JPY":12913,"Commute_Purpose":"Shopping","Satisfaction_Score":3.4},{"Record_ID":48,"Date":"2025-02-18","Prefecture":"Saitama","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":280,"Monthly_Cost_JPY":34675,"Commute_Purpose":"Work","Satisfaction_Score":4.8},{"Record_ID":49,"Date":"2025-02-19","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":322,"Monthly_Cost_JPY":27113,"Commute_Purpose":"Shopping","Satisfaction_Score":4.4},{"Record_ID":50,"Date":"2025-02-20","Prefecture":"Hokkaido","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":115,"Monthly_Cost_JPY":18716,"Commute_Purpose":"Work","Satisfaction_Score":4.1},{"Record_ID":51,"Date":"2025-02-21","Prefecture":"Aichi","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":36,"Monthly_Cost_JPY":19484,"Commute_Purpose":"Mixed","Satisfaction_Score":4.5},{"Record_ID":52,"Date":"2025-02-22","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":154,"Monthly_Cost_JPY":24530,"Commute_Purpose":"Education","Satisfaction_Score":3.3},{"Record_ID":53,"Date":"2025-02-23","Prefecture":"Tokyo","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":118,"Monthly_Cost_JPY":5555,"Commute_Purpose":"Education","Satisfaction_Score":4.3},{"Record_ID":54,"Date":"2025-02-24","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":51,"Monthly_Cost_JPY":6655,"Commute_Purpose":"Shopping","Satisfaction_Score":3.6},{"Record_ID":55,"Date":"2025-02-25","Prefecture":"Kyoto","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":213,"Monthly_Cost_JPY":12828,"Commute_Purpose":"Education","Satisfaction_Score":4.9},{"Record_ID":56,"Date":"2025-02-26","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":171,"Monthly_Cost_JPY":15339,"Commute_Purpose":"Leisure","Satisfaction_Score":4.8},{"Record_ID":57,"Date":"2025-02-27","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":73,"Monthly_Cost_JPY":11734,"Commute_Purpose":"Education","Satisfaction_Score":3.9},{"Record_ID":58,"Date":"2025-02-28","Prefecture":"Hokkaido","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":352,"Monthly_Cost_JPY":19892,"Commute_Purpose":"Mixed","Satisfaction_Score":4.9},{"Record_ID":59,"Date":"2025-03-01","Prefecture":"Saitama","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":132,"Monthly_Cost_JPY":9485,"Commute_Purpose":"Leisure","Satisfaction_Score":3.5},{"Record_ID":60,"Date":"2025-03-02","Prefecture":"Osaka","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":208,"Monthly_Cost_JPY":20413,"Commute_Purpose":"Education","Satisfaction_Score":4.0},{"Record_ID":61,"Date":"2025-03-03","Prefecture":"Aichi","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":105,"Monthly_Cost_JPY":13540,"Commute_Purpose":"Shopping","Satisfaction_Score":3.2},{"Record_ID":62,"Date":"2025-03-04","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":37,"Monthly_Cost_JPY":19470,"Commute_Purpose":"Work","Satisfaction_Score":3.2},{"Record_ID":63,"Date":"2025-03-05","Prefecture":"Osaka","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":222,"Monthly_Cost_JPY":7173,"Commute_Purpose":"Education","Satisfaction_Score":3.4},{"Record_ID":64,"Date":"2025-03-06","Prefecture":"Hokkaido","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":32,"Monthly_Cost_JPY":23951,"Commute_Purpose":"Education","Satisfaction_Score":4.8},{"Record_ID":65,"Date":"2025-03-07","Prefecture":"Tokyo","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":264,"Monthly_Cost_JPY":11891,"Commute_Purpose":"Work","Satisfaction_Score":4.0},{"Record_ID":66,"Date":"2025-03-08","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":14,"Distance_km_Per_Week":193,"Monthly_Cost_JPY":23260,"Commute_Purpose":"Work","Satisfaction_Score":4.1},{"Record_ID":67,"Date":"2025-03-09","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":107,"Monthly_Cost_JPY":19983,"Commute_Purpose":"Work","Satisfaction_Score":4.8},{"Record_ID":68,"Date":"2025-03-10","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":132,"Monthly_Cost_JPY":12632,"Commute_Purpose":"Mixed","Satisfaction_Score":3.9},{"Record_ID":69,"Date":"2025-03-11","Prefecture":"Tokyo","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":378,"Monthly_Cost_JPY":5171,"Commute_Purpose":"Education","Satisfaction_Score":3.0},{"Record_ID":70,"Date":"2025-03-12","Prefecture":"Aichi","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":378,"Monthly_Cost_JPY":14017,"Commute_Purpose":"Work","Satisfaction_Score":3.2},{"Record_ID":71,"Date":"2025-03-13","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":80,"Monthly_Cost_JPY":3376,"Commute_Purpose":"Education","Satisfaction_Score":5.0},{"Record_ID":72,"Date":"2025-03-14","Prefecture":"Osaka","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":310,"Monthly_Cost_JPY":38384,"Commute_Purpose":"Leisure","Satisfaction_Score":3.7},{"Record_ID":73,"Date":"2025-03-15","Prefecture":"Hokkaido","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":275,"Monthly_Cost_JPY":35525,"Commute_Purpose":"Shopping","Satisfaction_Score":4.3},{"Record_ID":74,"Date":"2025-03-16","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":9,"Distance_km_Per_Week":213,"Monthly_Cost_JPY":18187,"Commute_Purpose":"Leisure","Satisfaction_Score":3.8},{"Record_ID":75,"Date":"2025-03-17","Prefecture":"Hokkaido","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":18,"Distance_km_Per_Week":130,"Monthly_Cost_JPY":3965,"Commute_Purpose":"Leisure","Satisfaction_Score":4.2},{"Record_ID":76,"Date":"2025-03-18","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":282,"Monthly_Cost_JPY":13716,"Commute_Purpose":"Mixed","Satisfaction_Score":3.1},{"Record_ID":77,"Date":"2025-03-19","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":280,"Monthly_Cost_JPY":16543,"Commute_Purpose":"Work","Satisfaction_Score":3.9},{"Record_ID":78,"Date":"2025-03-20","Prefecture":"Hokkaido","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":215,"Monthly_Cost_JPY":5583,"Commute_Purpose":"Leisure","Satisfaction_Score":3.2},{"Record_ID":79,"Date":"2025-03-21","Prefecture":"Hokkaido","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":154,"Monthly_Cost_JPY":14898,"Commute_Purpose":"Leisure","Satisfaction_Score":3.3},{"Record_ID":80,"Date":"2025-03-22","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":223,"Monthly_Cost_JPY":16788,"Commute_Purpose":"Work","Satisfaction_Score":3.6},{"Record_ID":81,"Date":"2025-03-23","Prefecture":"Kanagawa","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":20,"Distance_km_Per_Week":50,"Monthly_Cost_JPY":21775,"Commute_Purpose":"Mixed","Satisfaction_Score":3.9},{"Record_ID":82,"Date":"2025-03-24","Prefecture":"Osaka","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":135,"Monthly_Cost_JPY":16172,"Commute_Purpose":"Leisure","Satisfaction_Score":4.8},{"Record_ID":83,"Date":"2025-03-25","Prefecture":"Saitama","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":130,"Monthly_Cost_JPY":30836,"Commute_Purpose":"Shopping","Satisfaction_Score":3.7},{"Record_ID":84,"Date":"2025-03-26","Prefecture":"Hokkaido","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":203,"Monthly_Cost_JPY":11786,"Commute_Purpose":"Mixed","Satisfaction_Score":3.3},{"Record_ID":85,"Date":"2025-03-27","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":11,"Distance_km_Per_Week":137,"Monthly_Cost_JPY":3600,"Commute_Purpose":"Shopping","Satisfaction_Score":3.7},{"Record_ID":86,"Date":"2025-03-28","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":198,"Monthly_Cost_JPY":9406,"Commute_Purpose":"Leisure","Satisfaction_Score":4.1},{"Record_ID":87,"Date":"2025-03-29","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":116,"Monthly_Cost_JPY":16319,"Commute_Purpose":"Shopping","Satisfaction_Score":4.9},{"Record_ID":88,"Date":"2025-03-30","Prefecture":"Kyoto","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":349,"Monthly_Cost_JPY":30953,"Commute_Purpose":"Leisure","Satisfaction_Score":3.4},{"Record_ID":89,"Date":"2025-03-31","Prefecture":"Kanagawa","Age_Group":"18-25","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":44,"Monthly_Cost_JPY":8894,"Commute_Purpose":"Work","Satisfaction_Score":4.6},{"Record_ID":90,"Date":"2025-04-01","Prefecture":"Kanagawa","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":360,"Monthly_Cost_JPY":9229,"Commute_Purpose":"Education","Satisfaction_Score":4.1},{"Record_ID":91,"Date":"2025-04-02","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":20,"Distance_km_Per_Week":102,"Monthly_Cost_JPY":4687,"Commute_Purpose":"Mixed","Satisfaction_Score":4.9},{"Record_ID":92,"Date":"2025-04-03","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":316,"Monthly_Cost_JPY":9219,"Commute_Purpose":"Mixed","Satisfaction_Score":4.7},{"Record_ID":93,"Date":"2025-04-04","Prefecture":"Aichi","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":16,"Distance_km_Per_Week":127,"Monthly_Cost_JPY":8759,"Commute_Purpose":"Work","Satisfaction_Score":3.1},{"Record_ID":94,"Date":"2025-04-05","Prefecture":"Hokkaido","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":43,"Monthly_Cost_JPY":14672,"Commute_Purpose":"Education","Satisfaction_Score":4.3},{"Record_ID":95,"Date":"2025-04-06","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":227,"Monthly_Cost_JPY":14391,"Commute_Purpose":"Work","Satisfaction_Score":3.1},{"Record_ID":96,"Date":"2025-04-07","Prefecture":"Saitama","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":168,"Monthly_Cost_JPY":14284,"Commute_Purpose":"Work","Satisfaction_Score":4.1},{"Record_ID":97,"Date":"2025-04-08","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":13,"Distance_km_Per_Week":301,"Monthly_Cost_JPY":29053,"Commute_Purpose":"Shopping","Satisfaction_Score":4.6},{"Record_ID":98,"Date":"2025-04-09","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":128,"Monthly_Cost_JPY":16845,"Commute_Purpose":"Shopping","Satisfaction_Score":4.2},{"Record_ID":99,"Date":"2025-04-10","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":179,"Monthly_Cost_JPY":4251,"Commute_Purpose":"Work","Satisfaction_Score":4.2},{"Record_ID":100,"Date":"2025-04-11","Prefecture":"Osaka","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":390,"Monthly_Cost_JPY":22866,"Commute_Purpose":"Shopping","Satisfaction_Score":3.9},{"Record_ID":101,"Date":"2025-04-12","Prefecture":"Aichi","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":242,"Monthly_Cost_JPY":18853,"Commute_Purpose":"Leisure","Satisfaction_Score":4.0},{"Record_ID":102,"Date":"2025-04-13","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":14,"Distance_km_Per_Week":83,"Monthly_Cost_JPY":38803,"Commute_Purpose":"Leisure","Satisfaction_Score":4.3},{"Record_ID":103,"Date":"2025-04-14","Prefecture":"Kyoto","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":307,"Monthly_Cost_JPY":37702,"Commute_Purpose":"Shopping","Satisfaction_Score":4.0},{"Record_ID":104,"Date":"2025-04-15","Prefecture":"Tokyo","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":398,"Monthly_Cost_JPY":6798,"Commute_Purpose":"Mixed","Satisfaction_Score":4.4},{"Record_ID":105,"Date":"2025-04-16","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":13,"Distance_km_Per_Week":357,"Monthly_Cost_JPY":23733,"Commute_Purpose":"Mixed","Satisfaction_Score":4.3},{"Record_ID":106,"Date":"2025-04-17","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":41,"Monthly_Cost_JPY":24921,"Commute_Purpose":"Leisure","Satisfaction_Score":3.7},{"Record_ID":107,"Date":"2025-04-18","Prefecture":"Kyoto","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":107,"Monthly_Cost_JPY":19853,"Commute_Purpose":"Work","Satisfaction_Score":4.0},{"Record_ID":108,"Date":"2025-04-19","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":9,"Distance_km_Per_Week":33,"Monthly_Cost_JPY":14049,"Commute_Purpose":"Mixed","Satisfaction_Score":4.5},{"Record_ID":109,"Date":"2025-04-20","Prefecture":"Aichi","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":321,"Monthly_Cost_JPY":20769,"Commute_Purpose":"Leisure","Satisfaction_Score":4.3},{"Record_ID":110,"Date":"2025-04-21","Prefecture":"Osaka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":35,"Monthly_Cost_JPY":31724,"Commute_Purpose":"Work","Satisfaction_Score":4.5},{"Record_ID":111,"Date":"2025-04-22","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":106,"Monthly_Cost_JPY":6335,"Commute_Purpose":"Mixed","Satisfaction_Score":3.6},{"Record_ID":112,"Date":"2025-04-23","Prefecture":"Hokkaido","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":274,"Monthly_Cost_JPY":15555,"Commute_Purpose":"Education","Satisfaction_Score":4.2},{"Record_ID":113,"Date":"2025-04-24","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":314,"Monthly_Cost_JPY":39650,"Commute_Purpose":"Shopping","Satisfaction_Score":3.3},{"Record_ID":114,"Date":"2025-04-25","Prefecture":"Osaka","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":193,"Monthly_Cost_JPY":14881,"Commute_Purpose":"Work","Satisfaction_Score":4.8},{"Record_ID":115,"Date":"2025-04-26","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":30,"Monthly_Cost_JPY":5848,"Commute_Purpose":"Shopping","Satisfaction_Score":4.5},{"Record_ID":116,"Date":"2025-04-27","Prefecture":"Kyoto","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":70,"Monthly_Cost_JPY":13775,"Commute_Purpose":"Mixed","Satisfaction_Score":4.7},{"Record_ID":117,"Date":"2025-04-28","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":235,"Monthly_Cost_JPY":30851,"Commute_Purpose":"Education","Satisfaction_Score":4.2},{"Record_ID":118,"Date":"2025-04-29","Prefecture":"Hokkaido","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":13,"Distance_km_Per_Week":186,"Monthly_Cost_JPY":12499,"Commute_Purpose":"Leisure","Satisfaction_Score":4.4},{"Record_ID":119,"Date":"2025-04-30","Prefecture":"Kanagawa","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":73,"Monthly_Cost_JPY":10878,"Commute_Purpose":"Education","Satisfaction_Score":3.2},{"Record_ID":120,"Date":"2025-05-01","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":171,"Monthly_Cost_JPY":18560,"Commute_Purpose":"Leisure","Satisfaction_Score":4.0},{"Record_ID":121,"Date":"2025-05-02","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":165,"Monthly_Cost_JPY":7431,"Commute_Purpose":"Shopping","Satisfaction_Score":3.0},{"Record_ID":122,"Date":"2025-05-03","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":133,"Monthly_Cost_JPY":10312,"Commute_Purpose":"Mixed","Satisfaction_Score":4.8},{"Record_ID":123,"Date":"2025-05-04","Prefecture":"Fukuoka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":63,"Monthly_Cost_JPY":10284,"Commute_Purpose":"Education","Satisfaction_Score":4.3},{"Record_ID":124,"Date":"2025-05-05","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":49,"Monthly_Cost_JPY":20306,"Commute_Purpose":"Shopping","Satisfaction_Score":3.8},{"Record_ID":125,"Date":"2025-05-06","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":217,"Monthly_Cost_JPY":39327,"Commute_Purpose":"Mixed","Satisfaction_Score":4.7},{"Record_ID":126,"Date":"2025-05-07","Prefecture":"Tokyo","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":162,"Monthly_Cost_JPY":22210,"Commute_Purpose":"Education","Satisfaction_Score":3.3},{"Record_ID":127,"Date":"2025-05-08","Prefecture":"Aichi","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":45,"Monthly_Cost_JPY":5104,"Commute_Purpose":"Work","Satisfaction_Score":3.3},{"Record_ID":128,"Date":"2025-05-09","Prefecture":"Hokkaido","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":65,"Monthly_Cost_JPY":23610,"Commute_Purpose":"Mixed","Satisfaction_Score":4.1},{"Record_ID":129,"Date":"2025-05-10","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":78,"Monthly_Cost_JPY":3653,"Commute_Purpose":"Work","Satisfaction_Score":4.8},{"Record_ID":130,"Date":"2025-05-11","Prefecture":"Kyoto","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":395,"Monthly_Cost_JPY":38079,"Commute_Purpose":"Education","Satisfaction_Score":3.9},{"Record_ID":131,"Date":"2025-05-12","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":14,"Distance_km_Per_Week":116,"Monthly_Cost_JPY":39257,"Commute_Purpose":"Work","Satisfaction_Score":4.7},{"Record_ID":132,"Date":"2025-05-13","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":225,"Monthly_Cost_JPY":11983,"Commute_Purpose":"Work","Satisfaction_Score":4.8},{"Record_ID":133,"Date":"2025-05-14","Prefecture":"Saitama","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":20,"Distance_km_Per_Week":51,"Monthly_Cost_JPY":13097,"Commute_Purpose":"Shopping","Satisfaction_Score":3.6},{"Record_ID":134,"Date":"2025-05-15","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":102,"Monthly_Cost_JPY":18294,"Commute_Purpose":"Shopping","Satisfaction_Score":3.7},{"Record_ID":135,"Date":"2025-05-16","Prefecture":"Kyoto","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":50,"Monthly_Cost_JPY":33106,"Commute_Purpose":"Mixed","Satisfaction_Score":3.1},{"Record_ID":136,"Date":"2025-05-17","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":20,"Distance_km_Per_Week":100,"Monthly_Cost_JPY":7080,"Commute_Purpose":"Shopping","Satisfaction_Score":4.3},{"Record_ID":137,"Date":"2025-05-18","Prefecture":"Kanagawa","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":156,"Monthly_Cost_JPY":7237,"Commute_Purpose":"Education","Satisfaction_Score":4.4},{"Record_ID":138,"Date":"2025-05-19","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":244,"Monthly_Cost_JPY":31609,"Commute_Purpose":"Work","Satisfaction_Score":3.0},{"Record_ID":139,"Date":"2025-05-20","Prefecture":"Saitama","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":193,"Monthly_Cost_JPY":7782,"Commute_Purpose":"Education","Satisfaction_Score":3.7},{"Record_ID":140,"Date":"2025-05-21","Prefecture":"Hokkaido","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":235,"Monthly_Cost_JPY":4337,"Commute_Purpose":"Shopping","Satisfaction_Score":4.8},{"Record_ID":141,"Date":"2025-05-22","Prefecture":"Osaka","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":246,"Monthly_Cost_JPY":3588,"Commute_Purpose":"Education","Satisfaction_Score":3.2},{"Record_ID":142,"Date":"2025-05-23","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":239,"Monthly_Cost_JPY":38893,"Commute_Purpose":"Shopping","Satisfaction_Score":4.7},{"Record_ID":143,"Date":"2025-05-24","Prefecture":"Kanagawa","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":236,"Monthly_Cost_JPY":20471,"Commute_Purpose":"Leisure","Satisfaction_Score":4.6},{"Record_ID":144,"Date":"2025-05-25","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":136,"Monthly_Cost_JPY":36192,"Commute_Purpose":"Mixed","Satisfaction_Score":3.7},{"Record_ID":145,"Date":"2025-05-26","Prefecture":"Kanagawa","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":62,"Monthly_Cost_JPY":36176,"Commute_Purpose":"Work","Satisfaction_Score":3.9},{"Record_ID":146,"Date":"2025-05-27","Prefecture":"Kanagawa","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":152,"Monthly_Cost_JPY":11058,"Commute_Purpose":"Education","Satisfaction_Score":3.0},{"Record_ID":147,"Date":"2025-05-28","Prefecture":"Aichi","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":126,"Monthly_Cost_JPY":14390,"Commute_Purpose":"Shopping","Satisfaction_Score":3.9},{"Record_ID":148,"Date":"2025-05-29","Prefecture":"Saitama","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":160,"Monthly_Cost_JPY":23466,"Commute_Purpose":"Education","Satisfaction_Score":3.5},{"Record_ID":149,"Date":"2025-05-30","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":13,"Distance_km_Per_Week":357,"Monthly_Cost_JPY":15875,"Commute_Purpose":"Leisure","Satisfaction_Score":3.6},{"Record_ID":150,"Date":"2025-05-31","Prefecture":"Saitama","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":120,"Monthly_Cost_JPY":11032,"Commute_Purpose":"Mixed","Satisfaction_Score":5.0},{"Record_ID":151,"Date":"2025-06-01","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":16,"Distance_km_Per_Week":24,"Monthly_Cost_JPY":17528,"Commute_Purpose":"Shopping","Satisfaction_Score":3.0},{"Record_ID":152,"Date":"2025-06-02","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":12,"Distance_km_Per_Week":138,"Monthly_Cost_JPY":28710,"Commute_Purpose":"Work","Satisfaction_Score":4.1},{"Record_ID":153,"Date":"2025-06-03","Prefecture":"Hokkaido","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":25,"Monthly_Cost_JPY":18246,"Commute_Purpose":"Leisure","Satisfaction_Score":3.3},{"Record_ID":154,"Date":"2025-06-04","Prefecture":"Tokyo","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":16,"Distance_km_Per_Week":144,"Monthly_Cost_JPY":24526,"Commute_Purpose":"Work","Satisfaction_Score":3.9},{"Record_ID":155,"Date":"2025-06-05","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":86,"Monthly_Cost_JPY":34380,"Commute_Purpose":"Work","Satisfaction_Score":4.3},{"Record_ID":156,"Date":"2025-06-06","Prefecture":"Kanagawa","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":340,"Monthly_Cost_JPY":27201,"Commute_Purpose":"Education","Satisfaction_Score":4.4},{"Record_ID":157,"Date":"2025-06-07","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":62,"Monthly_Cost_JPY":18041,"Commute_Purpose":"Mixed","Satisfaction_Score":3.6},{"Record_ID":158,"Date":"2025-06-08","Prefecture":"Aichi","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":226,"Monthly_Cost_JPY":33223,"Commute_Purpose":"Mixed","Satisfaction_Score":4.9},{"Record_ID":159,"Date":"2025-06-09","Prefecture":"Saitama","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":325,"Monthly_Cost_JPY":18188,"Commute_Purpose":"Work","Satisfaction_Score":3.2},{"Record_ID":160,"Date":"2025-06-10","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":242,"Monthly_Cost_JPY":19516,"Commute_Purpose":"Shopping","Satisfaction_Score":3.2},{"Record_ID":161,"Date":"2025-06-11","Prefecture":"Osaka","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":243,"Monthly_Cost_JPY":4825,"Commute_Purpose":"Leisure","Satisfaction_Score":3.5},{"Record_ID":162,"Date":"2025-06-12","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":189,"Monthly_Cost_JPY":7031,"Commute_Purpose":"Work","Satisfaction_Score":4.7},{"Record_ID":163,"Date":"2025-06-13","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":353,"Monthly_Cost_JPY":36580,"Commute_Purpose":"Education","Satisfaction_Score":4.7},{"Record_ID":164,"Date":"2025-06-14","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":19,"Distance_km_Per_Week":213,"Monthly_Cost_JPY":6167,"Commute_Purpose":"Education","Satisfaction_Score":4.0},{"Record_ID":165,"Date":"2025-06-15","Prefecture":"Hokkaido","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":157,"Monthly_Cost_JPY":7917,"Commute_Purpose":"Mixed","Satisfaction_Score":3.1},{"Record_ID":166,"Date":"2025-06-16","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":5,"Distance_km_Per_Week":100,"Monthly_Cost_JPY":10761,"Commute_Purpose":"Mixed","Satisfaction_Score":3.7},{"Record_ID":167,"Date":"2025-06-17","Prefecture":"Fukuoka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":16,"Distance_km_Per_Week":133,"Monthly_Cost_JPY":6527,"Commute_Purpose":"Leisure","Satisfaction_Score":4.5},{"Record_ID":168,"Date":"2025-06-18","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":254,"Monthly_Cost_JPY":29831,"Commute_Purpose":"Shopping","Satisfaction_Score":3.2},{"Record_ID":169,"Date":"2025-06-19","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":219,"Monthly_Cost_JPY":4311,"Commute_Purpose":"Mixed","Satisfaction_Score":3.7},{"Record_ID":170,"Date":"2025-06-20","Prefecture":"Osaka","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":90,"Monthly_Cost_JPY":3164,"Commute_Purpose":"Education","Satisfaction_Score":4.2},{"Record_ID":171,"Date":"2025-06-21","Prefecture":"Kyoto","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":322,"Monthly_Cost_JPY":27835,"Commute_Purpose":"Mixed","Satisfaction_Score":3.9},{"Record_ID":172,"Date":"2025-06-22","Prefecture":"Fukuoka","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":25,"Monthly_Cost_JPY":24293,"Commute_Purpose":"Leisure","Satisfaction_Score":3.7},{"Record_ID":173,"Date":"2025-06-23","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":222,"Monthly_Cost_JPY":15954,"Commute_Purpose":"Shopping","Satisfaction_Score":4.4},{"Record_ID":174,"Date":"2025-06-24","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":231,"Monthly_Cost_JPY":22569,"Commute_Purpose":"Leisure","Satisfaction_Score":3.2},{"Record_ID":175,"Date":"2025-06-25","Prefecture":"Tokyo","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":375,"Monthly_Cost_JPY":38697,"Commute_Purpose":"Leisure","Satisfaction_Score":4.8},{"Record_ID":176,"Date":"2025-06-26","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":82,"Monthly_Cost_JPY":3796,"Commute_Purpose":"Mixed","Satisfaction_Score":3.2},{"Record_ID":177,"Date":"2025-06-27","Prefecture":"Osaka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":189,"Monthly_Cost_JPY":21760,"Commute_Purpose":"Shopping","Satisfaction_Score":3.6},{"Record_ID":178,"Date":"2025-06-28","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":9,"Distance_km_Per_Week":121,"Monthly_Cost_JPY":20421,"Commute_Purpose":"Education","Satisfaction_Score":4.0},{"Record_ID":179,"Date":"2025-06-29","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":47,"Monthly_Cost_JPY":21262,"Commute_Purpose":"Education","Satisfaction_Score":3.7},{"Record_ID":180,"Date":"2025-06-30","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":15,"Distance_km_Per_Week":181,"Monthly_Cost_JPY":10704,"Commute_Purpose":"Shopping","Satisfaction_Score":3.6},{"Record_ID":181,"Date":"2025-07-01","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":205,"Monthly_Cost_JPY":34285,"Commute_Purpose":"Work","Satisfaction_Score":4.0},{"Record_ID":182,"Date":"2025-07-02","Prefecture":"Kanagawa","Age_Group":"36-45","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":76,"Monthly_Cost_JPY":13011,"Commute_Purpose":"Work","Satisfaction_Score":3.7},{"Record_ID":183,"Date":"2025-07-03","Prefecture":"Aichi","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":259,"Monthly_Cost_JPY":13069,"Commute_Purpose":"Mixed","Satisfaction_Score":5.0},{"Record_ID":184,"Date":"2025-07-04","Prefecture":"Tokyo","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":20,"Monthly_Cost_JPY":12603,"Commute_Purpose":"Work","Satisfaction_Score":4.3},{"Record_ID":185,"Date":"2025-07-05","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":155,"Monthly_Cost_JPY":4675,"Commute_Purpose":"Shopping","Satisfaction_Score":4.9},{"Record_ID":186,"Date":"2025-07-06","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":96,"Monthly_Cost_JPY":8776,"Commute_Purpose":"Shopping","Satisfaction_Score":3.3},{"Record_ID":187,"Date":"2025-07-07","Prefecture":"Osaka","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":224,"Monthly_Cost_JPY":13693,"Commute_Purpose":"Shopping","Satisfaction_Score":4.4},{"Record_ID":188,"Date":"2025-07-08","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":14,"Distance_km_Per_Week":112,"Monthly_Cost_JPY":22854,"Commute_Purpose":"Mixed","Satisfaction_Score":4.3},{"Record_ID":189,"Date":"2025-07-09","Prefecture":"Kanagawa","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":315,"Monthly_Cost_JPY":33699,"Commute_Purpose":"Leisure","Satisfaction_Score":3.6},{"Record_ID":190,"Date":"2025-07-10","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":50,"Monthly_Cost_JPY":7734,"Commute_Purpose":"Education","Satisfaction_Score":3.1},{"Record_ID":191,"Date":"2025-07-11","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":100,"Monthly_Cost_JPY":20409,"Commute_Purpose":"Shopping","Satisfaction_Score":4.6},{"Record_ID":192,"Date":"2025-07-12","Prefecture":"Fukuoka","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":379,"Monthly_Cost_JPY":15314,"Commute_Purpose":"Education","Satisfaction_Score":3.4},{"Record_ID":193,"Date":"2025-07-13","Prefecture":"Saitama","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":218,"Monthly_Cost_JPY":37562,"Commute_Purpose":"Mixed","Satisfaction_Score":3.8},{"Record_ID":194,"Date":"2025-07-14","Prefecture":"Kanagawa","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":52,"Monthly_Cost_JPY":16518,"Commute_Purpose":"Shopping","Satisfaction_Score":4.1},{"Record_ID":195,"Date":"2025-07-15","Prefecture":"Saitama","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":6,"Distance_km_Per_Week":161,"Monthly_Cost_JPY":8227,"Commute_Purpose":"Education","Satisfaction_Score":3.7},{"Record_ID":196,"Date":"2025-07-16","Prefecture":"Saitama","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":110,"Monthly_Cost_JPY":20911,"Commute_Purpose":"Shopping","Satisfaction_Score":4.6},{"Record_ID":197,"Date":"2025-07-17","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":57,"Monthly_Cost_JPY":14250,"Commute_Purpose":"Shopping","Satisfaction_Score":4.2},{"Record_ID":198,"Date":"2025-07-18","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":204,"Monthly_Cost_JPY":9916,"Commute_Purpose":"Work","Satisfaction_Score":3.6},{"Record_ID":199,"Date":"2025-07-19","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":5,"Distance_km_Per_Week":320,"Monthly_Cost_JPY":37764,"Commute_Purpose":"Education","Satisfaction_Score":4.2},{"Record_ID":200,"Date":"2025-07-20","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":19,"Distance_km_Per_Week":63,"Monthly_Cost_JPY":4222,"Commute_Purpose":"Education","Satisfaction_Score":4.2},{"Record_ID":201,"Date":"2025-07-21","Prefecture":"Fukuoka","Age_Group":"18-25","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":11,"Distance_km_Per_Week":98,"Monthly_Cost_JPY":18888,"Commute_Purpose":"Leisure","Satisfaction_Score":4.0},{"Record_ID":202,"Date":"2025-07-22","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":130,"Monthly_Cost_JPY":12274,"Commute_Purpose":"Work","Satisfaction_Score":3.3},{"Record_ID":203,"Date":"2025-07-23","Prefecture":"Hokkaido","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":7,"Distance_km_Per_Week":95,"Monthly_Cost_JPY":17921,"Commute_Purpose":"Mixed","Satisfaction_Score":3.4},{"Record_ID":204,"Date":"2025-07-24","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":18,"Distance_km_Per_Week":22,"Monthly_Cost_JPY":8803,"Commute_Purpose":"Leisure","Satisfaction_Score":4.1},{"Record_ID":205,"Date":"2025-07-25","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":13,"Distance_km_Per_Week":136,"Monthly_Cost_JPY":13669,"Commute_Purpose":"Education","Satisfaction_Score":4.7},{"Record_ID":206,"Date":"2025-07-26","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":13,"Distance_km_Per_Week":206,"Monthly_Cost_JPY":8336,"Commute_Purpose":"Mixed","Satisfaction_Score":3.7},{"Record_ID":207,"Date":"2025-07-27","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":196,"Monthly_Cost_JPY":19114,"Commute_Purpose":"Leisure","Satisfaction_Score":3.5},{"Record_ID":208,"Date":"2025-07-28","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":228,"Monthly_Cost_JPY":13823,"Commute_Purpose":"Mixed","Satisfaction_Score":4.6},{"Record_ID":209,"Date":"2025-07-29","Prefecture":"Aichi","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":9,"Distance_km_Per_Week":222,"Monthly_Cost_JPY":5621,"Commute_Purpose":"Mixed","Satisfaction_Score":3.3},{"Record_ID":210,"Date":"2025-07-30","Prefecture":"Saitama","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":134,"Monthly_Cost_JPY":15439,"Commute_Purpose":"Education","Satisfaction_Score":3.3},{"Record_ID":211,"Date":"2025-07-31","Prefecture":"Hokkaido","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":6,"Distance_km_Per_Week":268,"Monthly_Cost_JPY":9060,"Commute_Purpose":"Leisure","Satisfaction_Score":3.0},{"Record_ID":212,"Date":"2025-08-01","Prefecture":"Fukuoka","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":281,"Monthly_Cost_JPY":20899,"Commute_Purpose":"Work","Satisfaction_Score":4.0},{"Record_ID":213,"Date":"2025-08-02","Prefecture":"Fukuoka","Age_Group":"26-35","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":19,"Distance_km_Per_Week":193,"Monthly_Cost_JPY":11933,"Commute_Purpose":"Work","Satisfaction_Score":4.2},{"Record_ID":214,"Date":"2025-08-03","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":42,"Monthly_Cost_JPY":23366,"Commute_Purpose":"Education","Satisfaction_Score":3.6},{"Record_ID":215,"Date":"2025-08-04","Prefecture":"Kanagawa","Age_Group":"60+","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":154,"Monthly_Cost_JPY":11213,"Commute_Purpose":"Education","Satisfaction_Score":3.6},{"Record_ID":216,"Date":"2025-08-05","Prefecture":"Kyoto","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":356,"Monthly_Cost_JPY":16920,"Commute_Purpose":"Shopping","Satisfaction_Score":4.7},{"Record_ID":217,"Date":"2025-08-06","Prefecture":"Saitama","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":14,"Distance_km_Per_Week":104,"Monthly_Cost_JPY":11539,"Commute_Purpose":"Education","Satisfaction_Score":4.4},{"Record_ID":218,"Date":"2025-08-07","Prefecture":"Tokyo","Age_Group":"36-45","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":323,"Monthly_Cost_JPY":16416,"Commute_Purpose":"Shopping","Satisfaction_Score":4.3},{"Record_ID":219,"Date":"2025-08-08","Prefecture":"Hokkaido","Age_Group":"26-35","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":105,"Monthly_Cost_JPY":38028,"Commute_Purpose":"Mixed","Satisfaction_Score":4.1},{"Record_ID":220,"Date":"2025-08-09","Prefecture":"Tokyo","Age_Group":"46-60","Gender":"Male","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":44,"Monthly_Cost_JPY":19982,"Commute_Purpose":"Work","Satisfaction_Score":4.1},{"Record_ID":221,"Date":"2025-08-10","Prefecture":"Aichi","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":55,"Monthly_Cost_JPY":5221,"Commute_Purpose":"Shopping","Satisfaction_Score":4.1},{"Record_ID":222,"Date":"2025-08-11","Prefecture":"Hokkaido","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":15,"Distance_km_Per_Week":374,"Monthly_Cost_JPY":33086,"Commute_Purpose":"Leisure","Satisfaction_Score":3.1},{"Record_ID":223,"Date":"2025-08-12","Prefecture":"Tokyo","Age_Group":"26-35","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":240,"Monthly_Cost_JPY":12220,"Commute_Purpose":"Leisure","Satisfaction_Score":3.8},{"Record_ID":224,"Date":"2025-08-13","Prefecture":"Fukuoka","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":159,"Monthly_Cost_JPY":11936,"Commute_Purpose":"Leisure","Satisfaction_Score":5.0},{"Record_ID":225,"Date":"2025-08-14","Prefecture":"Osaka","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":155,"Monthly_Cost_JPY":28772,"Commute_Purpose":"Shopping","Satisfaction_Score":3.8},{"Record_ID":226,"Date":"2025-08-15","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":7,"Distance_km_Per_Week":296,"Monthly_Cost_JPY":9357,"Commute_Purpose":"Work","Satisfaction_Score":3.5},{"Record_ID":227,"Date":"2025-08-16","Prefecture":"Hokkaido","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":369,"Monthly_Cost_JPY":38176,"Commute_Purpose":"Work","Satisfaction_Score":4.2},{"Record_ID":228,"Date":"2025-08-17","Prefecture":"Saitama","Age_Group":"46-60","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":4,"Distance_km_Per_Week":204,"Monthly_Cost_JPY":34782,"Commute_Purpose":"Education","Satisfaction_Score":4.8},{"Record_ID":229,"Date":"2025-08-18","Prefecture":"Kyoto","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":238,"Monthly_Cost_JPY":17382,"Commute_Purpose":"Leisure","Satisfaction_Score":4.3},{"Record_ID":230,"Date":"2025-08-19","Prefecture":"Osaka","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":13,"Distance_km_Per_Week":292,"Monthly_Cost_JPY":32146,"Commute_Purpose":"Mixed","Satisfaction_Score":4.2},{"Record_ID":231,"Date":"2025-08-20","Prefecture":"Kanagawa","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":17,"Distance_km_Per_Week":174,"Monthly_Cost_JPY":8823,"Commute_Purpose":"Education","Satisfaction_Score":4.1},{"Record_ID":232,"Date":"2025-08-21","Prefecture":"Aichi","Age_Group":"60+","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":8,"Distance_km_Per_Week":127,"Monthly_Cost_JPY":10410,"Commute_Purpose":"Shopping","Satisfaction_Score":3.5},{"Record_ID":233,"Date":"2025-08-22","Prefecture":"Kanagawa","Age_Group":"26-35","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":3,"Distance_km_Per_Week":247,"Monthly_Cost_JPY":33012,"Commute_Purpose":"Mixed","Satisfaction_Score":4.3},{"Record_ID":234,"Date":"2025-08-23","Prefecture":"Kyoto","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":10,"Distance_km_Per_Week":113,"Monthly_Cost_JPY":20572,"Commute_Purpose":"Shopping","Satisfaction_Score":3.7},{"Record_ID":235,"Date":"2025-08-24","Prefecture":"Tokyo","Age_Group":"46-60","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":16,"Distance_km_Per_Week":38,"Monthly_Cost_JPY":17322,"Commute_Purpose":"Shopping","Satisfaction_Score":4.8},{"Record_ID":236,"Date":"2025-08-25","Prefecture":"Aichi","Age_Group":"60+","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":10,"Distance_km_Per_Week":111,"Monthly_Cost_JPY":35843,"Commute_Purpose":"Work","Satisfaction_Score":4.5},{"Record_ID":237,"Date":"2025-08-26","Prefecture":"Hokkaido","Age_Group":"36-45","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":8,"Distance_km_Per_Week":102,"Monthly_Cost_JPY":18848,"Commute_Purpose":"Work","Satisfaction_Score":4.6},{"Record_ID":238,"Date":"2025-08-27","Prefecture":"Osaka","Age_Group":"46-60","Gender":"Male","Transport_Type":"Personal Vehicle","Trips_Per_Week":14,"Distance_km_Per_Week":191,"Monthly_Cost_JPY":11674,"Commute_Purpose":"Mixed","Satisfaction_Score":3.1},{"Record_ID":239,"Date":"2025-08-28","Prefecture":"Osaka","Age_Group":"18-25","Gender":"Female","Transport_Type":"Personal Vehicle","Trips_Per_Week":9,"Distance_km_Per_Week":162,"Monthly_Cost_JPY":13397,"Commute_Purpose":"Work","Satisfaction_Score":4.5},{"Record_ID":240,"Date":"2025-08-29","Prefecture":"Tokyo","Age_Group":"60+","Gender":"Female","Transport_Type":"Public Transport","Trips_Per_Week":12,"Distance_km_Per_Week":119,"Monthly_Cost_JPY":7832,"Commute_Purpose":"Education","Satisfaction_Score":3.9}];
+
+// ── STATE ──
+const filters = { transport: 'all', gender: 'all', purpose: 'all' };
+let charts = {};
+
+const PREFECTURES = ['Tokyo','Osaka','Kyoto','Aichi','Kanagawa','Fukuoka','Saitama','Hokkaido'];
+const AGE_GROUPS  = ['18-25','26-35','36-45','46-60','60+'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+const PURPOSES = ['Work','Education','Shopping','Leisure','Mixed'];
+
+const RAIL = '#e63946', PLATFORM = '#457b9d', GOLD = '#f4a261', MOSS = '#52b788';
+const DEEP = '#1a1a2e', MIST = '#a8b5c8';
+
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function fmtCost(v) { return '¥'+Math.round(v/1000)+'k'; }
+function scoreColor(v) {
+  if(v>=4.5) return '#52b788';
+  if(v>=4.0) return '#90be6d';
+  if(v>=3.5) return '#f4a261';
+  return '#e63946';
+}
+
+function getFiltered() {
+  return RAW.filter(r =>
+    (filters.transport==='all' || r.Transport_Type===filters.transport) &&
+    (filters.gender==='all' || r.Gender===filters.gender) &&
+    (filters.purpose==='all' || r.Commute_Purpose===filters.purpose)
+  );
+}
+
+// ── CHIPS ──
+document.querySelectorAll('.chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.key, val = btn.dataset.val;
+    filters[key] = val;
+    document.querySelectorAll(`.chip[data-key="${key}"]`).forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    renderAll();
+  });
+});
+
+// ── MONTH METRIC ──
+let lineMetric = 'cost';
+document.querySelectorAll('.month-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    lineMetric = b.dataset.metric;
+    document.querySelectorAll('.month-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    renderLine();
+  });
+});
+
+// ── KPIs ──
+function renderKPIs(data) {
+  const pub = data.filter(r=>r.Transport_Type==='Public Transport').length;
+  const veh = data.length - pub;
+  const tot = data.length || 1;
+  document.getElementById('kpi-public').textContent = pub;
+  document.getElementById('kpi-public-pct').textContent = `${Math.round(pub/tot*100)}% of ${tot} records`;
+  document.getElementById('kpi-vehicle').textContent = veh;
+  document.getElementById('kpi-vehicle-pct').textContent = `${Math.round(veh/tot*100)}% of ${tot} records`;
+  document.getElementById('kpi-dist').textContent = Math.round(avg(data.map(r=>r.Distance_km_Per_Week)))+' km';
+  document.getElementById('kpi-sat').textContent = avg(data.map(r=>r.Satisfaction_Score)).toFixed(2);
+
+  document.getElementById('hs-records').textContent = tot;
+  document.getElementById('hs-avg-trips').textContent = avg(data.map(r=>r.Trips_Per_Week)).toFixed(1);
+  document.getElementById('hs-avg-sat').textContent = avg(data.map(r=>r.Satisfaction_Score)).toFixed(2);
+  const mc = avg(data.map(r=>r.Monthly_Cost_JPY));
+  document.getElementById('hs-avg-cost').textContent = '¥'+Math.round(mc/1000)+'.'+Math.round((mc%1000)/100)+'k';
+}
+
+// ── PREFECTURE BARS ──
+function renderPrefBars(data) {
+  const el = document.getElementById('pref-bars');
+  const byPref = {};
+  PREFECTURES.forEach(p => {
+    const d = data.filter(r=>r.Prefecture===p);
+    byPref[p] = { avg: avg(d.map(r=>r.Trips_Per_Week)), count: d.length };
+  });
+  const sorted = [...PREFECTURES].sort((a,b)=>byPref[b].avg-byPref[a].avg);
+  const maxVal = Math.max(...Object.values(byPref).map(v=>v.avg));
+  const colors = [RAIL, '#d62828', PLATFORM, '#2196f3', GOLD, MOSS, '#9b5de5', '#f15bb5'];
+  el.innerHTML = sorted.map((p,i) => {
+    const v = byPref[p].avg;
+    const pct = maxVal ? (v/maxVal*100) : 0;
+    return `<div class="pref-row">
+      <div class="pref-name">${p}</div>
+      <div class="pref-bar-track"><div class="pref-bar-fill" style="width:${pct}%;background:${colors[i]};"></div></div>
+      <div class="pref-val">${v.toFixed(1)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── DONUT CHART ──
+function renderDonut(data) {
+  const pub = data.filter(r=>r.Transport_Type==='Public Transport').length;
+  const veh = data.length - pub;
+  const ctx = document.getElementById('chart-donut').getContext('2d');
+  if(charts.donut) charts.donut.destroy();
+  charts.donut = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Public Transport','Personal Vehicle'],
+      datasets: [{ data: [pub,veh], backgroundColor: [PLATFORM, GOLD], borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/(pub+veh)*100)}%)`
+          }
+        }
+      }
+    }
+  });
+  const tot = data.length || 1;
+  document.getElementById('donut-legend').innerHTML = `
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="width:12px;height:12px;border-radius:2px;background:${PLATFORM};flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">${pub} records</div>
+          <div style="font-size:10px;color:${MIST};">Public Transport · ${Math.round(pub/tot*100)}%</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:12px;height:12px;border-radius:2px;background:${GOLD};flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">${veh} records</div>
+          <div style="font-size:10px;color:${MIST};">Personal Vehicle · ${Math.round(veh/tot*100)}%</div>
+        </div>
+      </div>
+    </div>
+    <div style="border-top:1px solid rgba(0,0,0,0.07);padding-top:12px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${MIST};margin-bottom:4px;">Avg Trips/Wk by Mode</div>
+      <div style="font-size:12px;font-weight:500;">🚆 ${avg(data.filter(r=>r.Transport_Type==='Public Transport').map(r=>r.Trips_Per_Week)).toFixed(1)} trips</div>
+      <div style="font-size:12px;font-weight:500;margin-top:2px;">🚗 ${avg(data.filter(r=>r.Transport_Type==='Personal Vehicle').map(r=>r.Trips_Per_Week)).toFixed(1)} trips</div>
+    </div>
+  `;
+}
+
+// ── LINE CHART ──
+function renderLine() {
+  const data = getFiltered();
+  const ctx = document.getElementById('chart-line').getContext('2d');
+  if(charts.line) charts.line.destroy();
+  const labels = MONTHS;
+  const monthNums = [1,2,3,4,5,6,7,8];
+  const vals = monthNums.map(m => {
+    const d = data.filter(r => parseInt(r.Date.split('-')[1])===m);
+    if(!d.length) return null;
+    if(lineMetric==='cost') return Math.round(avg(d.map(r=>r.Monthly_Cost_JPY)));
+    if(lineMetric==='trips') return parseFloat(avg(d.map(r=>r.Trips_Per_Week)).toFixed(1));
+    return parseFloat(avg(d.map(r=>r.Distance_km_Per_Week)).toFixed(1));
+  });
+  const label = lineMetric==='cost'?'Avg Monthly Cost ¥':lineMetric==='trips'?'Avg Trips/Wk':'Avg Distance km';
+  const color = lineMetric==='cost'?GOLD:lineMetric==='trips'?RAIL:MOSS;
+  charts.line = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data: vals,
+        borderColor: color,
+        backgroundColor: color+'22',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: color,
+        fill: true,
+        tension: 0.35,
+        spanGaps: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => lineMetric==='cost'?` ¥${c.parsed.y.toLocaleString()}`:` ${c.parsed.y}` } } },
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10, family: "'Space Mono'" } } },
+        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10, family: "'Space Mono'" }, callback: v => lineMetric==='cost'?`¥${Math.round(v/1000)}k`:v } }
+      }
+    }
+  });
+}
+
+// ── AGE BAR ──
+function renderAge(data) {
+  const ctx = document.getElementById('chart-age').getContext('2d');
+  if(charts.age) charts.age.destroy();
+  const vals = AGE_GROUPS.map(ag => {
+    const d = data.filter(r=>r.Age_Group===ag);
+    return d.length ? Math.round(avg(d.map(r=>r.Monthly_Cost_JPY))) : 0;
+  });
+  charts.age = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: AGE_GROUPS,
+      datasets: [{
+        label: 'Avg Monthly Cost ¥',
+        data: vals,
+        backgroundColor: [PLATFORM+'cc', MOSS+'cc', GOLD+'cc', RAIL+'cc', '#9b5de5cc'],
+        borderWidth: 0, borderRadius: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10, family: "'Space Mono'" } } },
+        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 }, callback: v=>`¥${Math.round(v/1000)}k` } }
+      }
+    }
+  });
+}
+
+// ── HEATMAP ──
+function renderHeatmap(data) {
+  const container = document.getElementById('heatmap-container');
+  // Build matrix: prefectures × age groups
+  const matrix = {};
+  PREFECTURES.forEach(p => {
+    matrix[p] = {};
+    AGE_GROUPS.forEach(ag => {
+      const d = data.filter(r=>r.Prefecture===p && r.Age_Group===ag);
+      matrix[p][ag] = d.length ? avg(d.map(r=>r.Satisfaction_Score)) : null;
+    });
+  });
+  const allVals = Object.values(matrix).flatMap(v=>Object.values(v).filter(x=>x!==null));
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  function cellColor(v) {
+    if(v===null) return '#f0ede8';
+    const t = (v-minV)/(maxV-minV||1);
+    if(t>0.75) return '#52b78822'; // moss
+    if(t>0.5) return '#90be6d22';
+    if(t>0.25) return '#f4a26122';
+    return '#e6394622';
+  }
+  function textColor(v) {
+    if(v===null) return '#ccc';
+    const t=(v-minV)/(maxV-minV||1);
+    if(t>0.75) return '#52b788';
+    if(t>0.5) return '#52a868';
+    if(t>0.25) return '#c47a30';
+    return '#c0303a';
+  }
+
+  const cols = AGE_GROUPS.length + 1;
+  container.innerHTML = `<div class="heatmap-grid" style="grid-template-columns:80px repeat(${AGE_GROUPS.length},1fr);">
+    <div></div>
+    ${AGE_GROUPS.map(ag=>`<div class="hm-col-label">${ag}</div>`).join('')}
+    ${PREFECTURES.map(p=>`
+      <div class="hm-row-label">${p}</div>
+      ${AGE_GROUPS.map(ag=>{
+        const v = matrix[p][ag];
+        return `<div class="heatmap-cell" style="background:${cellColor(v)};color:${textColor(v)};" title="${p} · ${ag}: ${v!==null?v.toFixed(2):'n/a'}">${v!==null?v.toFixed(1):'—'}</div>`;
+      }).join('')}
+    `).join('')}
+  </div>`;
+}
+
+// ── SATISFACTION RINGS ──
+function renderRings(data) {
+  const wrap = document.getElementById('rings-wrap');
+  wrap.innerHTML = PURPOSES.map(p => {
+    const d = data.filter(r=>r.Commute_Purpose===p);
+    const v = d.length ? avg(d.map(r=>r.Satisfaction_Score)) : 0;
+    const pct = (v/5)*100;
+    const r=28, circ=2*Math.PI*r, dash=circ*pct/100;
+    const col = scoreColor(v);
+    return `<div class="ring-item">
+      <svg class="ring-svg" width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r="${r}" fill="none" stroke="#f0ede8" stroke-width="5"/>
+        <circle cx="36" cy="36" r="${r}" fill="none" stroke="${col}" stroke-width="5"
+          stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ/4}" stroke-linecap="round" transform="rotate(-90 36 36)"/>
+        <text x="36" y="40" text-anchor="middle" font-family="'Space Mono'" font-size="13" font-weight="700" fill="${col}">${v.toFixed(1)}</text>
+      </svg>
+      <div class="ring-val" style="color:${col};font-size:11px;">${d.length} trips</div>
+      <div class="ring-label">${p}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── PURPOSE BAR ──
+function renderPurposeBar(data) {
+  const ctx = document.getElementById('chart-purpose-bar').getContext('2d');
+  if(charts.purposeBar) charts.purposeBar.destroy();
+  charts.purposeBar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: PURPOSES,
+      datasets: [
+        { label:'Public', data: PURPOSES.map(p=>{ const d=data.filter(r=>r.Commute_Purpose===p&&r.Transport_Type==='Public Transport'); return d.length?avg(d.map(r=>r.Satisfaction_Score)).toFixed(2):0; }), backgroundColor: PLATFORM+'cc', borderRadius:2, borderWidth:0 },
+        { label:'Vehicle', data: PURPOSES.map(p=>{ const d=data.filter(r=>r.Commute_Purpose===p&&r.Transport_Type==='Personal Vehicle'); return d.length?avg(d.map(r=>r.Satisfaction_Score)).toFixed(2):0; }), backgroundColor: GOLD+'cc', borderRadius:2, borderWidth:0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'top', labels:{ font:{size:10}, boxWidth:10 } } },
+      scales: {
+        x: { grid:{display:false}, ticks:{font:{size:10}} },
+        y: { min:2.5, max:5.2, grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:10}} }
+      }
+    }
+  });
+}
+
+// ── SCATTER ──
+function renderScatter(data) {
+  const ctx = document.getElementById('chart-scatter').getContext('2d');
+  if(charts.scatter) charts.scatter.destroy();
+  const pub = data.filter(r=>r.Transport_Type==='Public Transport');
+  const veh = data.filter(r=>r.Transport_Type==='Personal Vehicle');
+  charts.scatter = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label:'Public Transport', data: pub.map(r=>({x:r.Distance_km_Per_Week,y:r.Monthly_Cost_JPY,_d:r})), backgroundColor: PLATFORM+'bb', pointRadius:5 },
+        { label:'Personal Vehicle', data: veh.map(r=>({x:r.Distance_km_Per_Week,y:r.Monthly_Cost_JPY,_d:r})), backgroundColor: GOLD+'bb', pointRadius:5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'top', labels:{ font:{size:10}, boxWidth:10 } },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const d = c.raw._d;
+              return [`${d.Prefecture} · ${d.Age_Group} · ${d.Gender}`, `Dist: ${d.Distance_km_Per_Week} km  Cost: ¥${d.Monthly_Cost_JPY.toLocaleString()}`, `Sat: ${d.Satisfaction_Score} · ${d.Commute_Purpose}`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { title:{display:true,text:'Distance km/week',font:{size:10}}, grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:10}} },
+        y: { title:{display:true,text:'Monthly Cost ¥',font:{size:10}}, grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:10}, callback:v=>`¥${Math.round(v/1000)}k`} }
+      }
+    }
+  });
+}
+
+// ── TABLE ──
+let tableData = [];
+function renderTable(data) {
+  tableData = data;
+  applyTableSearch(document.getElementById('table-search').value);
+}
+function applyTableSearch(q) {
+  const s = q.toLowerCase();
+  const filtered = tableData.filter(r =>
+    !s || r.Prefecture.toLowerCase().includes(s) || r.Age_Group.includes(s) ||
+    r.Commute_Purpose.toLowerCase().includes(s) || r.Gender.toLowerCase().includes(s) ||
+    r.Transport_Type.toLowerCase().includes(s)
+  );
+  document.getElementById('table-count').textContent = `${filtered.length} rows`;
+  document.getElementById('table-body').innerHTML = filtered.slice(0,100).map(r => {
+    const sc = scoreColor(r.Satisfaction_Score);
+    const badge = r.Transport_Type==='Public Transport'?'badge-public':'badge-vehicle';
+    return `<tr>
+      <td style="font-family:'Space Mono',monospace;font-size:11px;">${r.Date}</td>
+      <td>${r.Prefecture}</td>
+      <td>${r.Age_Group}</td>
+      <td>${r.Gender}</td>
+      <td><span class="transport-badge ${badge}">${r.Transport_Type==='Public Transport'?'Public':'Vehicle'}</span></td>
+      <td style="font-family:'Space Mono',monospace;">${r.Trips_Per_Week}</td>
+      <td style="font-family:'Space Mono',monospace;">${r.Distance_km_Per_Week}</td>
+      <td style="font-family:'Space Mono',monospace;">¥${r.Monthly_Cost_JPY.toLocaleString()}</td>
+      <td>${r.Commute_Purpose}</td>
+      <td><span class="score-dot" style="background:${sc};"></span><span style="font-family:'Space Mono',monospace;font-size:11px;">${r.Satisfaction_Score}</span></td>
+    </tr>`;
+  }).join('');
+}
+document.getElementById('table-search').addEventListener('input', e => applyTableSearch(e.target.value));
+
+// ── RENDER ALL ──
+function renderAll() {
+  const data = getFiltered();
+  renderKPIs(data);
+  renderPrefBars(data);
+  renderDonut(data);
+  renderLine();
+  renderAge(data);
+  renderHeatmap(data);
+  renderRings(data);
+  renderPurposeBar(data);
+  renderScatter(data);
+  renderTable(data);
+}
+
+renderAll();
+</script>
+</body>
+</html>
